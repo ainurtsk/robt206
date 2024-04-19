@@ -1,0 +1,633 @@
+module draw(GPIO_0, clk, reset,sw, sw1, button1, button2, button3, MTL2_DCLK, MTL2_R, MTL2_G, MTL2_B, MTL2_HSD, MTL2_VSD);
+input clk;
+input sw;
+input sw1;
+input button1;
+input button2;
+input button3;
+input reset;
+output MTL2_DCLK;
+output [7:0] MTL2_R;
+output [7:0] MTL2_G;
+output [7:0] MTL2_B;
+output MTL2_HSD;
+output MTL2_VSD;
+reg [7:0] red, green, blue;
+inout [33:0] GPIO_0;
+
+
+localparam counterClock = 0;
+reg[11:0] counterClk = counterClock;
+
+
+wire res=~reset;
+wire display_on;
+wire [11:0] hpos; // horizontal pixels position of the display
+wire [11:0] vpos; // horizontal pixels position of the display
+reg clk25 = 0;
+always @(posedge clk) clk25<=~clk25;
+
+//Code for generating random number (0 or 1) using LFSR
+reg [15:0] lfsr = 16'hACE1;  // Initial value of LFSR
+always @(posedge clk) begin
+    lfsr <= {lfsr[14:0], lfsr[15] ^ lfsr[5] ^ lfsr[4] ^ lfsr[3]};
+end
+
+wire[11:0] random_bit1 = lfsr[0]; // Use the LSB as the random bit
+wire random_bit = random_bit1 == 1;
+
+hvsync test(
+ .clk(clk25),  
+ .reset(0),
+ .data_enable(display_on),  
+ .hsync(MTL2_HSD),
+ .vsync(MTL2_VSD),  
+ .hpos(hpos),
+ .vpos(vpos));
+ 
+localparam LINE = 799;
+localparam SCREEN = 479;
+wire data_enable = ((hpos <= LINE && hpos >= 0) && (vpos <= SCREEN && vpos >= 0));
+
+localparam treeSize = 150;
+localparam halflife = 80;
+
+//Initial position of tree branches
+
+localparam treeBranch = halflife;
+localparam treeBranchHorizontal = 85;
+localparam treeBranchVertical = 315;
+reg[11:0] treeBranch_hpos = treeBranchHorizontal;
+reg[11:0] treeBranch_vpos = treeBranchVertical;
+
+localparam treeBranch2 = halflife;
+localparam treeBranchHorizontal2 = 235;
+localparam treeBranchVertical2 = 85;
+reg[11:0] treeBranch2_hpos = treeBranchHorizontal2;
+reg[11:0] treeBranch2_vpos = treeBranchVertical2;
+
+localparam treeBranch3 = halflife;
+localparam treeBranchHorizontal3 = 385;
+localparam treeBranchVertical3 = 85;
+reg[11:0] treeBranch3_hpos = treeBranchHorizontal3;
+reg[11:0] treeBranch3_vpos = treeBranchVertical3;
+
+localparam treeBranch4 = halflife;
+localparam treeBranchHorizontal4 = 535;
+localparam treeBranchVertical4 = 315;
+reg[11:0] treeBranch4_hpos = treeBranchHorizontal4;
+reg[11:0] treeBranch4_vpos = treeBranchVertical4;
+
+localparam count = 0;
+reg[11:0] counter = count;
+reg[11:0] countPattern = count;
+reg[11:0] longterm = count;
+reg[11:0] divisor = count;
+
+// Start Screen
+localparam pixel = 10;
+
+localparam Lpart1 = pixel;
+localparam Lpart1Horizontal = 50 ;
+localparam Lpart1Vertical = 420 ;
+reg[11:0] Lll_hpos = Lpart1Horizontal;
+reg[11:0] Lll_vpos = Lpart1Vertical;
+
+
+localparam game_lost1 = 0;
+reg[11:0] game_lost = game_lost1;
+
+//Main Logic of the game (moving branches and generate at random position at the top)
+always @(negedge MTL2_VSD) begin
+  
+  game_lost = game_lost1;
+  if (counter != 20) begin
+      counter = counter + 1;
+		
+  end
+	
+	
+  
+   if (counter == 20) begin
+		//"counter" is needed to ensure that the game 
+		//doesn't run too fast without waiting 
+		//for the input from the buttons
+		if((!button1 || !GPIO_0[9]) && divisor  != 0) begin  
+			if (treeBranch4_vpos < 240) begin
+				game_lost = 1;
+			end
+				
+			treeBranch4_hpos = treeBranch4_hpos + treeSize;
+				
+			treeBranch3_hpos = treeBranch3_hpos + treeSize;
+			treeBranch4_hpos = treeBranch3_hpos;
+			treeBranch4_vpos = treeBranch3_vpos;
+				
+			treeBranch2_hpos = treeBranch2_hpos + treeSize;
+			treeBranch3_hpos = treeBranch2_hpos;
+			treeBranch3_vpos = treeBranch2_vpos;
+				
+			treeBranch_hpos = treeBranch_hpos + treeSize;
+			treeBranch2_hpos = treeBranch_hpos;
+			treeBranch2_vpos = treeBranch_vpos;
+				
+            if (random_bit) begin
+					treeBranch_vpos = 315;  //Put barnch the left side of the tree
+            end
+				
+            else if (!random_bit) begin
+				treeBranch_vpos = 85; // Put barnch the right side of the tree
+			end
+			treeBranch_hpos = 85; //Put branch on the top of the screen
+			counter = 0;
+		end
+		
+		if((!button2 || !GPIO_0[8]) && divisor != 0) begin          
+			if(treeBranch4_vpos > 240) begin
+					game_lost = 1;
+			end
+				
+			treeBranch4_hpos = treeBranch4_hpos + treeSize;
+				
+			treeBranch3_hpos = treeBranch3_hpos + treeSize;
+			treeBranch4_hpos = treeBranch3_hpos;
+			treeBranch4_vpos = treeBranch3_vpos;
+				
+			treeBranch2_hpos = treeBranch2_hpos + treeSize;
+			treeBranch3_hpos = treeBranch2_hpos;
+			treeBranch3_vpos = treeBranch2_vpos;
+				
+			treeBranch_hpos = treeBranch_hpos + treeSize;
+			treeBranch2_hpos = treeBranch_hpos;
+			treeBranch2_vpos = treeBranch_vpos;
+            
+			if (random_bit) begin
+				treeBranch_vpos = 315;  //Put barnch the left side of the tree
+            end
+				
+            else if(!random_bit) begin
+                treeBranch_vpos = 85; //Put barnch the right side of the tree
+            end
+
+			treeBranch_hpos = 85; //Put branch on the top of the screen
+			counter = 0;
+		end
+		
+		if (divisor == 0) begin
+			divisor = divisor + 1;
+		end
+	end
+end
+
+wire [11:0] hddifBranch = hpos - treeBranch_hpos;
+wire [11:0] vddifBranch = vpos - treeBranch_vpos;
+wire treeBranch_hgfx = hddifBranch < halflife;
+wire treeBranch_vgfx = vddifBranch < halflife;
+wire treeBranch_gfx = treeBranch_hgfx && treeBranch_vgfx;
+  
+wire [11:0] hddifBranch2 = hpos - treeBranch2_hpos;
+wire [11:0] vddifBranch2 = vpos - treeBranch2_vpos;
+wire treeBranch2_hgfx = hddifBranch2 < halflife;
+wire treeBranch2_vgfx = vddifBranch2 < halflife;
+wire treeBranch2_gfx = treeBranch2_hgfx && treeBranch2_vgfx;
+  
+wire [11:0] hddifBranch3 = hpos - treeBranch3_hpos;
+wire [11:0] vddifBranch3 = vpos - treeBranch3_vpos;
+wire treeBranch3_hgfx = hddifBranch3 < halflife;
+wire treeBranch3_vgfx = vddifBranch3 < halflife;
+wire treeBranch3_gfx = treeBranch3_hgfx && treeBranch3_vgfx;
+  
+wire [11:0] hddifBranch4 = hpos - treeBranch4_hpos;
+wire [11:0] vddifBranch4 = vpos - treeBranch4_vpos;
+wire treeBranch4_hgfx = hddifBranch4 < halflife;
+wire treeBranch4_vgfx = vddifBranch4 < halflife;
+wire treeBranch4_gfx = treeBranch4_hgfx && treeBranch4_vgfx;
+
+
+wire [11:0] hddifPix = hpos - Lll_hpos;
+wire [11:0] vddifPix = vpos - Lll_vpos;
+wire Pix_hdfx = hddifPix < Lpart1;
+wire Pix_vgfx = vddifPix < Lpart1;
+wire Pix_gfx = Pix_hdfx && Pix_vgfx;
+  
+wire [11:0] hddifPix1 = hpos - Lll_hpos;
+wire [11:0] vddifPix1 = vpos - Lll_vpos;
+wire Pix_hdfx1 = hddifPix1 < 50;
+wire Pix_vgfx1 = vddifPix1 < 10;
+wire Pix_gfx1 = Pix_hdfx1 && Pix_vgfx1; 
+  
+
+//Printing "Game Over" screen
+always @(posedge clk25)begin
+	if (counterClk == 2) begin
+			if(
+					(
+					((hpos - 260 < 20)
+					&&
+					(vpos - 355 < 70))
+					||
+					((hpos - 260 < 110)
+					&&
+					(vpos - 405 < 20))
+					|| 
+					((hpos - 350 < 20)
+					&&
+					(vpos - 355 < 70))
+					|| 
+					((hpos - 305 < 20)
+					&&
+					(vpos - 355 < 40))
+					|| 
+					((hpos - 305 < 45)
+					&&
+					(vpos - 355 < 20))
+// G is completed
+					||
+					((hpos - 260 < 20)
+					&&
+					(vpos - 255 < 70))
+					||
+					((hpos - 260 < 110)
+					&&
+					(vpos - 255 < 20))
+					|| 
+					((hpos - 260 < 110)
+					&&
+					(vpos - 315 < 20))
+					|| 
+					((hpos - 335 < 20)
+					&&
+					(vpos - 255 < 70))
+// A is completed
+					||
+					((hpos - 260 < 20)
+					&&
+					(vpos - 150 < 70))
+					||
+					((hpos - 260 < 110)
+					&&
+					(vpos - 210 < 15))
+					|| 
+					((hpos - 260 < 110)
+					&&
+					(vpos - 180 < 15))
+					|| 
+					((hpos - 260 < 110)
+					&&
+					(vpos - 150 < 15))
+// M is completed
+					||
+					((hpos - 260 < 20)
+					&&
+					(vpos - 55 < 70))
+					||
+					((hpos - 260 < 110)
+					&&
+					(vpos - 105 < 20))
+					|| 
+					((hpos - 305 < 20)
+					&&
+					(vpos - 55 < 70))
+					|| 
+					((hpos - 350 < 20)
+					&&
+					(vpos - 55 < 70))
+					
+// E is completed
+
+					||
+					((hpos - 430 < 20)
+					&&
+					(vpos - 345 < 80))
+					||
+					((hpos - 520 < 20)
+					&&
+					(vpos - 345 < 80))
+					|| 
+					((hpos - 430 < 110)
+					&&
+					(vpos - 405 < 20))
+					|| 
+					((hpos - 430 < 110)
+					&&
+					(vpos - 345 < 20))
+					
+// O is completed			
+					||
+					((hpos - 430 < 70)
+					&&
+					(vpos - 315 < 20))
+					||
+					((hpos - 430 < 70)
+					&&
+					(vpos - 255 < 20))
+					|| 
+					((hpos - 480 < 20)
+					&&
+					(vpos - 255 < 80))
+					|| 
+					((hpos - 500 < 20)
+					&&
+					(vpos - 275 < 40))
+					||
+					((hpos - 520 < 20)
+					&&
+					(vpos - 280 < 30))
+					
+// V is completed
+	
+					||
+					((hpos - 430 < 110)
+					&&
+					(vpos - 205 < 20))
+					||
+					((hpos - 430 < 20)
+					&&
+					(vpos - 145 < 80))
+					|| 
+					((hpos - 475 < 20)
+					&&
+					(vpos - 145 < 20))
+					|| 
+					((hpos - 520 < 20)
+					&&
+					(vpos - 145 < 80))
+					
+// E is completed
+
+					||
+					((hpos - 430 < 20)
+					&&
+					(vpos - 35 < 80))
+					||
+					((hpos - 430 < 110)
+					&&
+					(vpos - 95 < 20))
+					
+// R is completed
+					)
+					&&
+					 data_enable
+					)
+					begin
+						 red <= 8'hee;
+						 green <= 8'hee;
+						 blue <= 8'hee;
+						end
+					else begin
+						red <=8'd0;  
+						green <=8'd0;      
+						blue <=8'd0;
+					end
+				end
+				
+		
+//Printing "LumberJack" opening screen
+		if (counterClk == 0) begin
+//			
+		   if (
+				(
+					((hpos - 50 < 50) 
+				&& 
+					(vpos - 420 < 10)) 
+				||
+					((hpos - 90 < 10) 
+				&& 
+					(vpos - 405 < 25)) 
+// L is completed
+				||
+					((hpos - 90 < 10)
+				&&
+					(vpos - 355 < 25))
+				||
+					((hpos - 70 < 30)
+				&&
+					(vpos - 380 < 10))
+				||
+					((hpos - 70 < 30)
+				&&
+					(vpos - 355 < 10))
+// U is completed				
+				||
+					((hpos - 70 < 10)
+				&&
+					(vpos - 280 < 50))
+				||
+					((hpos - 70 < 30)
+				&&
+					(vpos - 280 < 10))
+				||
+					((hpos - 70 < 30)
+				&&
+					(vpos - 300 < 10))
+				||
+					((hpos - 70 < 30)
+				&&
+					(vpos - 320 < 10))
+//M is completed
+				||
+					((hpos - 50 < 50)
+				&&
+					(vpos - 245 < 10))
+				||
+					((hpos - 70 < 30)	
+				&&
+					(vpos - 225 < 10))
+				||
+					((hpos - 70 < 10)
+				&&
+					(vpos - 225 < 30))
+				||
+					((hpos - 70 < 30)
+				&&
+					(vpos - 245 < 10))
+				||
+					((hpos - 90 < 10)
+				&&
+					(vpos - 225 < 30))
+//B is completed
+				||
+					((hpos - 70 < 30)
+				&&
+					(vpos - 190 < 10))
+				||
+					((hpos - 70 < 6)
+				&&
+					(vpos - 170 < 20))
+				||
+					((hpos - 70 < 12)
+				&&
+					(vpos - 170 < 6))
+				||
+					((hpos - 82 < 6)
+				&&
+					(vpos - 170 < 20))
+				||
+					((hpos - 94 < 6)
+				&&
+					(vpos - 170 < 20))
+//E is completed
+				||
+					((hpos - 70 < 30)
+				&&
+					(vpos - 130 < 10))
+				||
+					((hpos - 70 < 10)
+				&&
+					(vpos - 110 < 30))	
+//R is completed 		
+				)
+				&& 
+					data_enable
+				) 
+				begin
+				red <= 8'hee;
+				green <= 8'hee;
+				blue <= 8'hee;
+			end
+			
+			else if(
+				(
+					((hpos - 150 < 50)
+				&&
+					(vpos - 220 < 10))
+				||
+					((hpos - 150 < 10)
+				&&
+					(vpos - 220 < 40))
+				||
+					((hpos - 190 < 10)
+				&&
+					(vpos - 220 < 30))
+				||
+					((hpos - 180 < 20)
+				&&
+					(vpos - 240 < 10))
+//J is completed
+				||
+					((hpos - 170 < 30)
+				&&
+					(vpos - 165 < 10))
+				||
+					((hpos - 170 < 6)
+				&&
+					(vpos - 165 < 30))
+				||
+					((hpos - 182 < 6 )
+				&&
+					(vpos - 165 < 30))
+				||
+					((hpos - 194 < 6)
+				&&
+					(vpos - 165 < 30))
+				||
+					((hpos - 182 < 18)
+				&&
+					(vpos - 189 < 6))
+//A is completed
+				||
+					((hpos - 170 < 10)
+				&&
+					(vpos - 110 < 30))
+				||
+					((hpos - 170 < 30)
+				&&
+					(vpos - 130 < 10))
+				||
+					((hpos - 190 < 10)
+				&&
+					(vpos - 110 < 30))
+//C is completed
+				||
+					((hpos - 170 < 10)
+				&&
+					(vpos - 55 < 30))
+				||
+					((hpos - 190 < 10)
+				&&
+					(vpos - 55 < 30))
+				||
+					((hpos - 140 < 60)
+				&&
+					(vpos - 75 < 10))	
+//K is completed
+				)
+				)
+				begin
+				red <= 8'hee;
+				green <= 8'h00;
+				blue <= 8'h00;
+			end				
+			
+			else begin
+				red <=8'd0;  
+				green <=8'd0;      
+				blue <=8'd0;
+			end
+		end
+		
+		
+		if((!GPIO_0[9] || !button2 || !GPIO_0[9] || !button1)  && counterClk == 0) begin
+			counterClk = counterClk + 1;
+		end	
+		
+		if(counterClk == 1 && game_lost == 1) begin
+			counterClk = counterClk + 1;
+		end
+		
+		if(counterClk == 2 && !button3) begin
+			counterClk = counterClk - 2;
+		end
+		
+		if (counterClk == 1) begin
+				
+			if( 
+					((hpos - 0 < 800)
+				&&
+					(vpos - 165 < 150))
+				&& 
+				data_enable) begin
+				red <= 8'h82;
+				green <= 8'h41;
+				blue <= 8'h1f;
+			end
+			
+			else if(treeBranch_gfx && data_enable) begin
+				red <= 8'h46;
+				green <= 8'hce;
+				blue <= 8'h2f;
+			end
+			
+			else if(treeBranch2_gfx && data_enable) begin
+				red <= 8'h46;
+				green <= 8'hce;
+				blue <= 8'h2f;
+			end
+			
+			else if(treeBranch3_gfx && data_enable) begin
+				red <= 8'h46;
+				green <= 8'hce;
+				blue <= 8'h2f;
+			end
+			
+			else if(treeBranch4_gfx && data_enable) begin
+				red <= 8'h46;
+				green <= 8'hce;
+				blue <= 8'h2f;
+			end
+			
+			else begin
+				red <=8'd0;  
+				green <=8'd0;      
+				blue <=8'd0;
+			end
+		end
+  end 
+  
+      
+	assign MTL2_DCLK=clk25;
+	assign MTL2_R=red;  
+	assign MTL2_G=green;
+	assign MTL2_B=blue;
+	
+endmodule
